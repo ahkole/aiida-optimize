@@ -31,6 +31,7 @@ class _ConvergenceImpl(OptimizationEngineImpl):
         tol: float,
         input_key: str,
         result_key: str,
+        distance_type: str,
         convergence_window: int,
         array_name: ty.Optional[str],
         current_index: int,
@@ -49,6 +50,14 @@ class _ConvergenceImpl(OptimizationEngineImpl):
         self.current_index = current_index
         self.result_values = result_values
         self.initialized = initialized
+        if distance_type == "2-norm":
+            self._distance = np.linalg.norm
+        elif distance_type == "max-abs-diff":
+            self._distance = lambda x: np.max(np.abs(x))
+        else:
+            raise ValueError(
+                "Invalid value for input 'distance_type'. Allowed values: [2-norm, max-abs-diff]"
+            )
 
     @property
     def _state(self) -> ty.Dict[str, ty.Any]:
@@ -85,7 +94,7 @@ class _ConvergenceImpl(OptimizationEngineImpl):
         # |x_i - x_j| for i [0, N-1], j (i, N]
         distance_triangle = [
             [
-                np.linalg.norm(self._result_window[i] - self._result_window[j])
+                self._distance(self._result_window[i] - self._result_window[j])
                 for j in range(i + 1, self.convergence_window)
             ]
             for i in range(self.convergence_window - 1)
@@ -217,6 +226,10 @@ class Convergence(OptimizationEngineWrapper):
         Name of the input key which should be varied to find convergence
     result_key : str
         Name of the output / result key which is the value to converge
+    distance_type : str
+        How to compute distance between result values/arrays.
+        '2-norm' for Frobenius norm
+        'max-abs-diff' for element wise maximum absolute difference
     convergence_window : int
         Number of results to consider when checking convergence
     array_name : str or None
@@ -232,6 +245,7 @@ class Convergence(OptimizationEngineWrapper):
         tol: float,
         input_key: str,
         result_key: str,
+        distance_type: str = "2-norm",
         convergence_window: int = 2,
         array_name: ty.Optional[str] = None,
         logger: ty.Optional[ty.Any] = None,
@@ -241,6 +255,7 @@ class Convergence(OptimizationEngineWrapper):
             tol=tol,
             input_key=input_key,
             result_key=result_key,
+            distance_type=distance_type,
             convergence_window=convergence_window,
             array_name=array_name,
             current_index=0,
